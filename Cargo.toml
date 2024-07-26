@@ -8,3 +8,7 @@ edition = "2021"
 yew = { git = "https://github.com/yewstack/yew/", features = ["csr"] }
 web-sys = "0.3.69"
 wasm-bindgen = "0.2"
+serde = "1.0.204"
+reqwasm = "0.5.0"
+serde_json = "1.0.120"
+wasm-bindgen-futures = "0.4.42"
