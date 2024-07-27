@@ -17,7 +17,7 @@ struct Note {
 struct Notes {
     id: String,
     description: String,
-    tittle: Option<String>,
+    title: Option<String>,
 }
 #[function_component]
 fn App() -> Html {
@@ -29,7 +29,7 @@ fn App() -> Html {
     let notes = use_state(|| Vec::new()); // State to hold the list of notes
     let is_loading = use_state(|| false); // State to handle loading status
 
-    let oninput_title = {
+    let oninput_tittle = {
         let note = note.clone();
         Callback::from(move |input_event: InputEvent| {
             let target: HtmlInputElement = input_event
@@ -125,6 +125,7 @@ fn App() -> Html {
                             }
                         };
                         notes.set(fetched_notes);
+			web_sys::console::log_1(&JsValue::from_str(&format!("notes: {:?}", notes)));
                     }
                     Err(err) => {
                         let error_message = err.to_string();
@@ -137,38 +138,40 @@ fn App() -> Html {
         })
     };
 
-    html! {
+   html! {
+    <div>
         <div>
-            <div>
-                <input name="tittle" oninput={oninput_title} placeholder="tittle" />
-            </div>
-            <div>
-                <input name="description" oninput={oninput_description} placeholder="description" />
-            </div>
-            <button onclick={on_submit}>{ "Add me" }</button>
+            <input name="tittle" oninput={oninput_tittle} placeholder="tittle" />
+        </div>
+        <div>
+            <input name="description" oninput={oninput_description} placeholder="description" />
+        </div>
+        <button onclick={on_submit}>{ "Add me" }</button>
 
-            <div>
-                <button onclick={fetch_notes}>{ "Load Notes" }</button>
-                { 
-                    if *is_loading {
-                        html! { <p>{ "Loading..." }</p> }
-                    } else {
-                        html! {
-                            <ul>
-                                {
-                                    for notes.iter().map(|note| html! {
-                                        <li>
-                                           { &note.tittle }  { &note.description }
-                                        </li>
-                                    })
-                                }
-                            </ul>
-                        }
+        <div>
+            <button onclick={fetch_notes}>{ "Load Notes" }</button>
+            { 
+                if *is_loading {
+                    html! { <p>{ "Loading..." }</p> }
+                } else {
+                    html! {
+                        <ul>
+                            {
+                                for notes.iter().map(|note| html! {
+                                    <li>
+                                       { note.title.as_ref().unwrap_or(&"No title".to_string()) } {" "} 
+                                       { if note.description.is_empty() { "No description".to_string() } else { note.description.clone() } }
+                                    </li>
+                                })
+                            }
+                        </ul>
                     }
                 }
-            </div>
+            }
         </div>
-    }
+    </div>
+}
+
 }
 
 fn main() {
