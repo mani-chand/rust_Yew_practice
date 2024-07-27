@@ -10,17 +10,24 @@ use serde_json;  // Import serde_json
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Note {
-    title: String,
+    tittle: String,
     description: String,
 }
-
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct Notes {
+    id: String,
+    description: String,
+    tittle: Option<String>,
+}
 #[function_component]
 fn App() -> Html {
     let note = use_state(|| Note {
-        title: "".to_string(),
+        tittle: "".to_string(),
         description: "".to_string(),
     });
-    let response = use_state(|| None::<String>);  // Specify the type for response state
+    let response = use_state(|| None::<String>);
+    let notes = use_state(|| Vec::new()); // State to hold the list of notes
+    let is_loading = use_state(|| false); // State to handle loading status
 
     let oninput_title = {
         let note = note.clone();
@@ -30,17 +37,17 @@ fn App() -> Html {
                 .unwrap_throw()
                 .dyn_into()
                 .unwrap_throw();
-            if target.name() == "title" {
+            if target.name() == "tittle" {
                 note.set(Note {
-                    title: target.value(),
+                    tittle: target.value(),
                     ..(*note).clone()
                 });
-                web_sys::console::log_1(&target.value().into());
+                // web_sys::console::log_1(&target.value().into());
             }
         })
     };
 
-    let oninput_age = {
+    let oninput_description = {
         let note = note.clone();
         Callback::from(move |input_event: InputEvent| {
             let target: HtmlInputElement = input_event
@@ -53,7 +60,7 @@ fn App() -> Html {
                     description: target.value(),
                     ..(*note).clone()
                 });
-                web_sys::console::log_1(&target.value().into());
+                // web_sys::console::log_1(&target.value().into());
             }
         })
     };
@@ -62,7 +69,7 @@ fn App() -> Html {
         let note = note.clone();
         let response = response.clone();
         Callback::from(move |_| {
-            let note = (*note).clone(); // Cloning the note state to use inside the async block
+            let note = (*note).clone();
             let response_future = async move {
                 let request_body = match serde_json::to_string(&note) {
                     Ok(body) => body,
@@ -82,10 +89,9 @@ fn App() -> Html {
                     Ok(resp) => {
                         let text = resp.text().await.unwrap_or_default();
                         web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(text.as_str()));
-                        // response.set(Some(text));  // Correctly updating the state with response text
+                        // response.set(Some(text));  // Optionally update response state if needed
                     }
                     Err(err) => {
-                        // Convert reqwasm::Error to a string for logging
                         let error_message = err.to_string();
                         web_sys::console::log_1(&JsValue::from_str(&error_message));
                     }
@@ -96,22 +102,71 @@ fn App() -> Html {
         })
     };
 
+    let fetch_notes = {
+        let notes = notes.clone();
+        let is_loading = is_loading.clone();
+        Callback::from(move |_| {
+            let notes = notes.clone();
+            let is_loading = is_loading.clone();
+            let fetch_future = async move {
+                is_loading.set(true);
+                match Request::get("http://localhost:8080/api")
+                    .send()
+                    .await
+                {
+                    Ok(response) => {
+                        let text = response.text().await.unwrap_or_default();
+                        web_sys::console::log_1(&JsValue::from_str(&format!("Notes: {:?}", text)));
+                        let fetched_notes: Vec<Notes> = match serde_json::from_str(&text) {
+                            Ok(notes) => notes,
+                            Err(err) => {
+                                web_sys::console::log_1(&JsValue::from_str(&format!("Failed to notes: {:?}", err)));
+                                Vec::new()
+                            }
+                        };
+                        notes.set(fetched_notes);
+                    }
+                    Err(err) => {
+                        let error_message = err.to_string();
+                        web_sys::console::log_1(&JsValue::from_str(&format!("Failed to fetch notes: {}", error_message)));
+                    }
+                }
+                is_loading.set(false);
+            };
+            spawn_local(fetch_future);
+        })
+    };
+
     html! {
         <div>
             <div>
-                <input name="title" oninput={oninput_title} placeholder="title" />
+                <input name="tittle" oninput={oninput_title} placeholder="tittle" />
             </div>
             <div>
-                <input name="description" oninput={oninput_age} placeholder="description" />
+                <input name="description" oninput={oninput_description} placeholder="description" />
             </div>
             <button onclick={on_submit}>{ "Add me" }</button>
-            // {
-            //     if let Some(response_text) = &*response {
-            //         html! { <div>{ response_text.clone() }</div> }
-            //     } else {
-            //         html! {}
-            //     }
-            // }
+
+            <div>
+                <button onclick={fetch_notes}>{ "Load Notes" }</button>
+                { 
+                    if *is_loading {
+                        html! { <p>{ "Loading..." }</p> }
+                    } else {
+                        html! {
+                            <ul>
+                                {
+                                    for notes.iter().map(|note| html! {
+                                        <li>
+                                           { &note.tittle }  { &note.description }
+                                        </li>
+                                    })
+                                }
+                            </ul>
+                        }
+                    }
+                }
+            </div>
         </div>
     }
 }
